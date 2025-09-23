@@ -12,7 +12,7 @@ const Navbar = () => {
   return (
     <nav className="navbar-container">
       <div className="navbar-logo-container">
-        <Link to="/" className="navbar-brand">
+        <Link to="/" className="navbar-brand" onClick={() => setIsOpen(false)}>
           <img
             src="/src/assets/logo.png"
             alt="Raulo Enterprises Logo"
@@ -22,6 +22,7 @@ const Navbar = () => {
         </Link>
       </div>
 
+      {/* Mobile Toggle */}
       <button className="navbar-toggle-button" onClick={toggleNavbar}>
         <svg
           className="navbar-hamburger-icon"
@@ -39,6 +40,7 @@ const Navbar = () => {
         </svg>
       </button>
 
+      {/* Navbar Links */}
       <div className={`navbar-links-container ${isOpen ? "open" : ""}`}>
         <ul className="navbar-links">
           <li>
@@ -62,6 +64,11 @@ const Navbar = () => {
             </NavLink>
           </li>
           <li>
+            <NavLink to="/testimonials" className="navbar-link" onClick={() => setIsOpen(false)}>
+              Testimonials
+            </NavLink>
+          </li>
+          <li>
             <NavLink to="/contact" className="navbar-link" onClick={() => setIsOpen(false)}>
               Contact Us
             </NavLink>
@@ -69,8 +76,9 @@ const Navbar = () => {
         </ul>
       </div>
 
+      {/* CTA Get Started → SignIn */}
       <div className="navbar-cta-container">
-        <Link to="/get-started" className="navbar-cta-button" onClick={() => setIsOpen(false)}>
+        <Link to="/signin" className="navbar-cta-button" onClick={() => setIsOpen(false)}>
           Get Started <span className="arrow-icon">&rarr;</span>
         </Link>
       </div>

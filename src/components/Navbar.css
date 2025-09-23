@@ -1,8 +1,9 @@
 /* Container styles */
 .navbar-container {
-  position: sticky;      /* Sticky navbar */
+  position: fixed; 
   top: 0;
-  background-color: rgba(255, 255, 255, 0.1); /* translucent glass effect */
+  left: 0;
+  background-color: rgba(255, 255, 255, 0.1);
   color: white;
   padding: 15px 50px;
   display: flex;
@@ -10,15 +11,13 @@
   align-items: center;
   font-family: sans-serif;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  z-index: 100;
+  z-index: 1000;
   width: 100%;
-  
-  /* Glass blur effect */
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.18); /* subtle border for glass look */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 
-  /* Loading animation */
+  /* Animation */
   opacity: 0;
   transform: translateY(-20px);
   animation: navbarFadeIn 0.8s ease forwards;
@@ -31,7 +30,7 @@
   }
 }
 
-/* Logo and brand styles */
+/* Logo */
 .navbar-logo-container {
   display: flex;
   align-items: center;
@@ -45,26 +44,27 @@
 }
 
 .navbar-logo {
-  height: 40px; /* Increase if needed */
+  height: 40px;
   margin-right: 10px;
 }
 
 .navbar-title {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: bold;
 }
 
-/* Toggle button for mobile */
+/* Hamburger Button */
 .navbar-toggle-button {
   display: none;
   background: none;
   border: none;
   cursor: pointer;
+  z-index: 1100;
 }
 
 .navbar-hamburger-icon {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
 }
 
 /* Links container */
@@ -78,8 +78,8 @@
   margin: 0;
   padding: 0;
   display: flex;
-  gap: 40px;
-  font-size: 16px;
+  gap: 2rem;
+  font-size: 1rem;
 }
 
 /* Individual link styles */
@@ -87,22 +87,21 @@
   color: white;
   text-decoration: none;
   padding: 5px 0;
-  transition: color 0.3s ease, border-bottom 0.3s ease;
   position: relative;
+  transition: color 0.3s ease;
 }
 
 .navbar-link:after {
   content: "";
   position: absolute;
   left: 0;
-  bottom: 0;
+  bottom: -3px;
   width: 0;
   height: 3px;
   background-color: #ffcc00;
   transition: width 0.3s ease;
 }
 
-/* Hover effect */
 .navbar-link:hover {
   color: #ffcc00;
 }
@@ -112,23 +111,25 @@
   width: 100%;
 }
 
-/* Active link */
 .navbar-link.active {
   color: #ffcc00;
-  border-bottom: 3px solid #ffcc00;
 }
 
-/* Call to action button */
+/* CTA button (desktop) */
+.navbar-cta-container {
+  margin-left: 1.5rem;
+}
+
 .navbar-cta-button {
   background-color: #ffcc00;
   color: #0d122e;
   padding: 10px 20px;
-  border-radius: 5px;
+  border-radius: 8px;
   text-decoration: none;
   font-weight: bold;
   display: flex;
   align-items: center;
-  transition: background-color 0.3s ease, transform 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .navbar-cta-button:hover {
@@ -140,55 +141,84 @@
   margin-left: 8px;
 }
 
-/* Media query for mobile responsiveness */
-@media (max-width: 768px) {
+/* CTA inside mobile menu (hidden on desktop) */
+.navbar-cta-mobile {
+  display: none;
+  margin-top: 15px;
+}
+
+/* Responsive Styles */
+@media (max-width: 992px) {
   .navbar-container {
-    flex-wrap: wrap;
-    padding: 15px 20px;
+    padding: 15px 25px;
   }
 
+  .navbar-links {
+    gap: 1.5rem;
+  }
+
+  .navbar-title {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 768px) {
   .navbar-toggle-button {
     display: block;
   }
 
   .navbar-links-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
     width: 100%;
     max-height: 0;
     overflow: hidden;
     flex-direction: column;
-    align-items: flex-start;
+    background: rgba(15, 18, 46, 0.95);
+    backdrop-filter: blur(12px);
     transition: max-height 0.3s ease-in-out;
   }
 
   .navbar-links-container.open {
     max-height: 500px;
+    padding: 20px;
   }
 
   .navbar-links {
     flex-direction: column;
+    gap: 20px;
     width: 100%;
-    gap: 15px;
-    padding: 20px 0;
-  }
-
-  .navbar-links li {
-    width: 100%;
-  }
-
-  .navbar-link {
-    display: block;
-    width: 100%;
-    padding: 10px 0;
+    text-align: center;
   }
 
   .navbar-cta-container {
+    display: none; /* Hide desktop CTA */
+  }
+
+  .navbar-cta-mobile {
+    display: block;
+    text-align: center;
     width: 100%;
-    margin-top: 15px;
   }
 
   .navbar-cta-button {
-    display: block;
     width: 100%;
-    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-title {
+    font-size: 1.1rem;
+  }
+
+  .navbar-logo {
+    height: 32px;
+  }
+
+  .navbar-cta-button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
   }
 }
