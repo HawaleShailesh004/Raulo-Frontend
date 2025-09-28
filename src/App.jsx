@@ -32,7 +32,7 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
 
           {/* Get Started route → redirect to SignIn */}
-          <Route path="/get-started" element={<SignIn />} />
+          <Route path="/contact" element={<Contact />} />
         </Routes>
       </div>
     </Router>

@@ -68,18 +68,13 @@ const Navbar = () => {
               Testimonials
             </NavLink>
           </li>
-          <li>
-            <NavLink to="/contact" className="navbar-link" onClick={() => setIsOpen(false)}>
-              Contact Us
-            </NavLink>
-          </li>
         </ul>
       </div>
 
       {/* CTA Get Started → SignIn */}
       <div className="navbar-cta-container">
-        <Link to="/signin" className="navbar-cta-button" onClick={() => setIsOpen(false)}>
-          Get Started <span className="arrow-icon">&rarr;</span>
+        <Link to="/contact" className="navbar-cta-button" onClick={() => setIsOpen(false)}>
+          Contact Us <span className="arrow-icon">&rarr;</span>
         </Link>
       </div>
     </nav>

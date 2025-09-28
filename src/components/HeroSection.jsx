@@ -4,6 +4,7 @@ import HeroBg from "../assets/hero-bg.png";
 import HandLeft from "../assets/hand-left.png"; // 👈 left hand image
 import HandRight from "../assets/hand-right.png"; // 👈 right hand image
 import Navbar from "./Navbar";
+import { NavLink } from "react-router-dom";
 
 const gradientAnimation = `
   @keyframes gradient-shift {
@@ -71,7 +72,7 @@ const HeroSection = () => {
             That Drive{" "}
             <span
               className="text-[#FBBF24] hover:underline"
-              style={{ fontSize: "2.9rem"}}
+              style={{ fontSize: "2.9rem" }}
             >
               Success
             </span>
@@ -117,13 +118,13 @@ const HeroSection = () => {
 
         {/* Button */}
         <div className="mt-[-1rem]">
-          <a
-            href="#services"
+          <NavLink
+            to="/services"
             className="btn-animate flex items-center gap-2 px-8 py-4 font-bold text-lg sm:text-xl text-black bg-[#FBBF24] rounded-full shadow-lg"
           >
-            Explore Our Services
-            <span className="ml-2">→</span>
-          </a>
+            {" "}
+            Explore Our Services <span className="ml-2">→</span>{" "}
+          </NavLink>
         </div>
       </div>
     </section>
