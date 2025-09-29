@@ -1,5 +1,5 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
 
@@ -10,13 +10,23 @@ import Blog from "./components/Blogs";
 import Testimonial from "./components/Testimonial";
 import Contact from "./components/Contact";
 import SignIn from "./components/SignIn";
-import SignUp from "./components/SignnUp";
+import AdminPanel from "./components/AdminPanel";
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(null); // null = checking
+
+  // Check localStorage on mount
+  useEffect(() => {
+    const auth = localStorage.getItem("isAuthenticated") === "true";
+    setIsAuthenticated(auth);
+  }, []);
+
+  // While checking auth, render nothing to prevent flicker
+  if (isAuthenticated === null) return null;
+
   return (
     <Router>
       <div className="App">
-        {/* Toast messages */}
         <Toaster position="bottom-right" reverseOrder={false} />
 
         <Routes>
@@ -27,12 +37,32 @@ function App() {
           <Route path="/testimonials" element={<Testimonial />} />
           <Route path="/contact" element={<Contact />} />
 
-          {/* Auth Routes */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+          {/* Sign In */}
+          <Route
+            path="/signin"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <SignIn setIsAuthenticated={setIsAuthenticated} />
+              )
+            }
+          />
 
-          {/* Get Started route → redirect to SignIn */}
-          <Route path="/contact" element={<Contact />} />
+          {/* Protected Admin Panel */}
+          <Route
+            path="/admin"
+            element={
+              isAuthenticated ? (
+                <AdminPanel setIsAuthenticated={setIsAuthenticated} />
+              ) : (
+                <Navigate to="/signin" replace />
+              )
+            }
+          />
+
+          {/* Redirect unknown routes */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
