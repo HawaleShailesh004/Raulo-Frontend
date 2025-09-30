@@ -1,37 +1,39 @@
 // Services.jsx
-import React, { useState } from "react";
+import React, { use, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import Navbar from "./Navbar";
 import bg from "../assets/services-bg.png";
 
-const servicesData = [
-  {
-    title: "Social Media Marketing",
-    img: "https://cdn3d.iconscout.com/3d/premium/thumb/social-media-marketing-7064954-5760913.png",
-    desc: "Boost your online presence with strategic social media campaigns tailored to your audience.",
-  },
-  {
-    title: "Search Engine Optimization (SEO)",
-    img: "https://cdn3d.iconscout.com/3d/premium/thumb/seo-optimization-4311237-3580913.png",
-    desc: "Improve your website ranking and visibility with effective SEO strategies.",
-  },
-  {
-    title: "Content Marketing",
-    img: "https://cdn3d.iconscout.com/3d/premium/thumb/content-marketing-4311235-3580912.png",
-    desc: "Engage and retain customers with impactful blogs, posts, and creative content.",
-  },
-  {
-    title: "Web Development",
-    img: "https://cdn3d.iconscout.com/3d/premium/thumb/web-development-6814412-5585225.png",
-    desc: "Modern, responsive, and user-friendly websites built for performance and scalability.",
-  },
-  {
-    title: "Graphic Design",
-    img: "https://cdn3d.iconscout.com/3d/premium/thumb/graphic-designer-6814414-5585227.png",
-    desc: "Creative and professional graphic design to build a unique brand identity.",
-  },
-];
+import apiService from "../api/apiService";
+
+// const servicesData = [
+//   {
+//     title: "Social Media Marketing",
+//     img: "https://cdn3d.iconscout.com/3d/premium/thumb/social-media-marketing-7064954-5760913.png",
+//     desc: "Boost your online presence with strategic social media campaigns tailored to your audience.",
+//   },
+//   {
+//     title: "Search Engine Optimization (SEO)",
+//     img: "https://cdn3d.iconscout.com/3d/premium/thumb/seo-optimization-4311237-3580913.png",
+//     desc: "Improve your website ranking and visibility with effective SEO strategies.",
+//   },
+//   {
+//     title: "Content Marketing",
+//     img: "https://cdn3d.iconscout.com/3d/premium/thumb/content-marketing-4311235-3580912.png",
+//     desc: "Engage and retain customers with impactful blogs, posts, and creative content.",
+//   },
+//   {
+//     title: "Web Development",
+//     img: "https://cdn3d.iconscout.com/3d/premium/thumb/web-development-6814412-5585225.png",
+//     desc: "Modern, responsive, and user-friendly websites built for performance and scalability.",
+//   },
+//   {
+//     title: "Graphic Design",
+//     img: "https://cdn3d.iconscout.com/3d/premium/thumb/graphic-designer-6814414-5585227.png",
+//     desc: "Creative and professional graphic design to build a unique brand identity.",
+//   },
+// ];
 
 const variants = {
   enter: (direction) => ({
@@ -49,21 +51,44 @@ const variants = {
 };
 
 const Services = () => {
+  const [serviceData, setServiceData] = useState([]);
+
+  useEffect(() => {
+    apiService.services
+      .getAll()
+      .then((response) => {
+        // success
+        console.log("Fetched services:", response.data);
+        setServiceData(response.data);
+      })
+      .catch((error) => console.error("Error fetching services:", error));
+  }, []);
+
+  useEffect(() => {
+    document.title = "Raulo Enterprises | Services";
+  }, []);
+
   const [[current, direction], setCurrent] = useState([0, 0]);
 
   const nextSlide = () => {
     setCurrent(([prev]) => [
-      (prev + 1) % servicesData.length,
+      (prev + 1) % serviceData.length,
       1, // direction right
     ]);
   };
 
   const prevSlide = () => {
     setCurrent(([prev]) => [
-      prev === 0 ? servicesData.length - 1 : prev - 1,
+      prev === 0 ? serviceData.length - 1 : prev - 1,
       -1, // direction left
     ]);
   };
+
+  if (!serviceData.length) {
+    return (
+      <div className="text-white text-center mt-32">Loading services...</div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative text-white overflow-hidden">
@@ -102,9 +127,10 @@ const Services = () => {
             onClick={prevSlide}
             className="absolute left-[-5rem] w-12 h-12 rounded-full flex items-center justify-center text-black z-20
                        bg-white/20 backdrop-blur-md border border-white/30 shadow-lg transition duration-300
-                       hover:shadow-[0_0_15px_rgba(255,215,0,0.7)] hover:bg-white/30" style={{borderRadius: '50%'}}
+                       hover:shadow-[0_0_15px_rgba(255,215,0,0.7)] hover:bg-white/30"
+            style={{ borderRadius: "50%" }}
           >
-            <ChevronLeft size={24} className="text-yellow-400"/>
+            <ChevronLeft size={24} className="text-yellow-400" />
           </motion.button>
 
           {/* Slide */}
@@ -123,22 +149,22 @@ const Services = () => {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 200 }}
-                className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-4 shadow-lg flex justify-center"
+                className="bg-white rounded-2xl md:rounded-3xl overflow-hidden p-0 md:p-0 shadow-lg flex justify-center items-center w-72 h-60 sm:w-80 sm:h-64 md:w-96 md:h-72"
               >
                 <img
-                  src={servicesData[current].img}
-                  alt={servicesData[current].title}
-                  className="w-52 h-44 sm:w-60 sm:h-52 md:w-72 md:h-60 object-contain"
+                  src={serviceData[current]?.images[0]}
+                  alt={serviceData[current]?.title}
+                  className="w-full h-full object-cover"
                 />
               </motion.div>
 
               {/* Content */}
               <div className="max-w-md text-center md:text-left">
                 <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold mb-3">
-                  {servicesData[current].title}
+                  {serviceData[current]?.title}
                 </h3>
                 <p className="text-gray-300 mb-6 text-sm sm:text-base md:text-lg">
-                  {servicesData[current].desc}
+                  {serviceData[current]?.shortDesc}
                 </p>
 
                 {/* Button */}
@@ -146,7 +172,7 @@ const Services = () => {
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                   href="#"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-pink-500 text-black px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold shadow-lg hover:shadow-yellow-500/50 transition text-sm sm:text-base md:text-lg"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-pink-500 text-black px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold shadow-lg hover:shadow-yellow-500/50 transition text-sm sm:text-base md:text-lg no-underline decoration-none hover:decoration-none"
                 >
                   View More <ArrowRight size={18} />
                 </motion.a>
@@ -161,7 +187,8 @@ const Services = () => {
             onClick={nextSlide}
             className="absolute right-[-5rem] w-12 h-12 rounded-full flex items-center justify-center text-black z-20
                        bg-white/20 backdrop-blur-md border border-white/30 shadow-lg transition duration-300
-                       hover:shadow-[0_0_15px_rgba(255,215,0,0.7)] hover:bg-white/30" style={{borderRadius: '50%'}}
+                       hover:shadow-[0_0_15px_rgba(255,215,0,0.7)] hover:bg-white/30"
+            style={{ borderRadius: "50%" }}
           >
             <ChevronRight size={24} className="text-yellow-400" />
           </motion.button>
@@ -169,13 +196,14 @@ const Services = () => {
 
         {/* Slider Dots */}
         <div className="flex gap-3 mt-8 rounded-full">
-          {servicesData.map((_, index) => (
+          {serviceData.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrent([index, index > current ? 1 : -1])}
               className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full transition-all duration-300 ${
                 current === index ? "bg-yellow-400 scale-125" : "bg-gray-400"
-              }`} style={{borderRadius: '50%'}}
+              }`}
+              style={{ borderRadius: "50%" }}
             />
           ))}
         </div>
