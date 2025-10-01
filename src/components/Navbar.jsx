@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import "./Navbar.css";
 
+import logo from "../assets/logo.png";
+
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -14,7 +16,7 @@ const Navbar = () => {
       <div className="navbar-logo-container">
         <Link to="/" className="navbar-brand" onClick={() => setIsOpen(false)}>
           <img
-            src="/src/assets/logo.png"
+            src={logo}
             alt="Raulo Enterprises Logo"
             className="navbar-logo"
           />
