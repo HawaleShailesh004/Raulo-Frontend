@@ -52,7 +52,8 @@ const apiService = {
     filter: (params) =>
       axiosClient.get(apiUris.inquiries.filter, { params }), // query params
     getById: (id) => axiosClient.get(apiUris.inquiries.getById(id)),
-    markAsHandled: (id) => axiosClient.patch(apiUris.inquiries.markAsHandled(id)),
+    markAsHandled: (id) => axiosClient.put(apiUris.inquiries.markAsHandled(id)),
+    delete: (id) => axiosClient.delete(`inquiries/${id}`), // DELETE
   },
 
   // 🔹 Services

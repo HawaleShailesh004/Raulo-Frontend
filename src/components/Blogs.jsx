@@ -20,6 +20,7 @@ const Blog = () => {
     apiService.blog
       .getAll()
       .then((response) => {
+        console.log("Fetched blogs:", response.data);
         setBlogs(response.data);
         setLoading(false);
       })

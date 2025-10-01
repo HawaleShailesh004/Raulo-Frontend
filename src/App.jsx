@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import React, { useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
 
@@ -10,16 +15,12 @@ import Blog from "./components/Blogs";
 import Testimonial from "./components/Testimonial";
 import Contact from "./components/Contact";
 import SignIn from "./components/SignIn";
-import AdminPanel from "./components/AdminPanel";
+import AdminPanel from "./components/admin/AdminPanel";
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(null); // null = checking
-
-  // Check localStorage on mount
-  useEffect(() => {
-    const auth = localStorage.getItem("isAuthenticated") === "true";
-    setIsAuthenticated(auth);
-  }, []);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    localStorage.getItem("accessToken") !== null
+  );
 
   // While checking auth, render nothing to prevent flicker
   if (isAuthenticated === null) return null;
@@ -53,11 +54,10 @@ function App() {
           <Route
             path="/admin"
             element={
-              isAuthenticated ? (
-                <AdminPanel setIsAuthenticated={setIsAuthenticated} />
-              ) : (
-                <Navigate to="/signin" replace />
-              )
+              <AdminPanel
+                isAuthenticated={isAuthenticated}
+                setIsAuthenticated={setIsAuthenticated}
+              />
             }
           />
 

@@ -64,6 +64,7 @@ const Services = () => {
       .then((response) => {
         setServiceData(response.data);
         setLoading(false);
+        console.log("Services fetched successfully:", response.data);
       })
       .catch((err) => {
         console.error("Error fetching services:", err);

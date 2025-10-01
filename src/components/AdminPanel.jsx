@@ -1,703 +1,435 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Editor } from "@tinymce/tinymce-react";
 
-function AdminPanel({ setIsAuthenticated }) {
-  const [items, setItems] = useState([]);
-  const [modalStep, setModalStep] = useState(0);
-  const [selectedType, setSelectedType] = useState("");
-  const [formData, setFormData] = useState({});
+// --- SVG Icons (Heroicons) ---
+// Using inline SVGs for simplicity, no extra dependencies needed.
+const PlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+// --- 1. CONFIGURATION ---
+// Central place to define form fields for each content type. Makes adding new types easier.
+const FORM_CONFIG = {
+  service: {
+    name: "Service",
+    color: "blue",
+    fields: [
+      { name: "name", placeholder: "Service Name", type: "text", required: true },
+      { name: "description", placeholder: "Service Description", type: "textarea", required: true },
+      { name: "icon", label: "Service Icon (Optional)", type: "file", accept: "image/*" },
+    ],
+  },
+  testimonial: {
+    name: "Testimonial",
+    color: "green",
+    fields: [
+      { name: "name", placeholder: "Client Name", type: "text", required: true },
+      { name: "text", placeholder: "Testimonial Text", type: "textarea", required: true },
+      { name: "photo", label: "Client Photo (Optional)", type: "file", accept: "image/*" },
+    ],
+  },
+  blog: {
+    name: "Blog Post",
+    color: "purple",
+    fields: [
+      { name: "title", placeholder: "Blog Title", type: "text", required: true },
+      { name: "image", label: "Blog Cover Image (Required)", type: "file", accept: "image/*", required: true },
+      { name: "content", type: "editor", required: true },
+    ],
+  },
+};
+
+
+// --- 2. CUSTOM HOOK FOR STATE MANAGEMENT ---
+/**
+ * @description Manages all state and logic for the admin panel content.
+ * This encapsulates the complexity, keeping components clean.
+ * @returns {object} State and handler functions.
+ */
+const useContentManager = (initialItems = []) => {
+  const [items, setItems] = useState(initialItems);
+  const [modalState, setModalState] = useState({ type: null, data: null }); // 'add', 'edit', 'view'
   const [viewItem, setViewItem] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [alert, setAlert] = useState(null);
 
-  // Sorting and Filtering State
-  const [filterType, setFilterType] = useState("all"); // 'all', 'service', 'testimonial', 'blog'
-  const [sortBy, setSortBy] = useState("newest"); // 'newest', 'oldest', 'alphabetical'
-
-  // Error/Success Handling State (from previous revision)
-  const [alertMessage, setAlertMessage] = useState(null); // { type: 'success'|'error'|'warning', message: string }
-  const [isEditorReady, setIsEditorReady] = useState(false);
-
-  // Blog editor state
-  const [blogContent, setBlogContent] = useState("");
-
-  // Clear alert message after a few seconds (from previous revision)
+  // Clear alert message after 5 seconds
   useEffect(() => {
-    if (alertMessage) {
-      const timer = setTimeout(() => {
-        setAlertMessage(null);
-      }, 5000);
+    if (alert) {
+      const timer = setTimeout(() => setAlert(null), 5000);
       return () => clearTimeout(timer);
     }
-  }, [alertMessage]);
-
-  // Sync blog content for update (unchanged)
-  useEffect(() => {
-    if (modalStep === 2 && selectedType === "blog") {
-      setBlogContent(formData.content || "");
-    }
-  }, [modalStep, selectedType, formData.content]);
-
-  // --- NEW: Memoized Filtered and Sorted Items ---
-  const filteredAndSortedItems = useMemo(() => {
+  }, [alert]);
+  
+  // Memoized filtering and sorting for performance
+  const processedItems = useMemo(() => {
     let currentItems = [...items];
-
-    // 1. Filtering
     if (filterType !== "all") {
       currentItems = currentItems.filter((item) => item.type === filterType);
     }
-
-    // 2. Sorting
     currentItems.sort((a, b) => {
-      // Items are saved with their id being the Date.now() timestamp, which is used for sorting.
-      const idA = a.id;
-      const idB = b.id;
-
-      if (sortBy === "newest") {
-        return idB - idA; // Descending timestamp
-      } else if (sortBy === "oldest") {
-        return idA - idB; // Ascending timestamp
-      } else if (sortBy === "alphabetical") {
-        // Get the main display name/title for comparison
+      if (sortBy === "newest") return b.id - a.id;
+      if (sortBy === "oldest") return a.id - b.id;
+      if (sortBy === "alphabetical") {
         const nameA = (a.data.name || a.data.title || "").toLowerCase();
         const nameB = (b.data.name || b.data.title || "").toLowerCase();
-
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
+        return nameA.localeCompare(nameB);
       }
       return 0;
     });
-
     return currentItems;
   }, [items, filterType, sortBy]);
-  // -----------------------------------------------
 
-  const handleLogout = () => {
+  const showAlert = (type, message) => setAlert({ type, message });
+
+  const handleSaveItem = (itemData) => {
     try {
-      localStorage.removeItem("isAuthenticated");
-      setIsAuthenticated(false);
-      setAlertMessage({
-        type: "success",
-        message: "Logged out successfully! 👋",
-      });
+      const { id, type, data } = itemData;
+      const isUpdating = !!id;
+      
+      const updatedItems = isUpdating
+        ? items.map(item => (item.id === id ? { ...item, data } : item))
+        : [...items, { id: Date.now(), type, data }];
+        
+      setItems(updatedItems);
+      setModalState({ type: null, data: null }); // Close modal
+      showAlert("success", `${FORM_CONFIG[type].name} ${isUpdating ? "updated" : "added"} successfully! 🎉`);
     } catch (error) {
-      setAlertMessage({
-        type: "error",
-        message: "Error during logout: Could not clear local storage.",
-      });
+      console.error("Save item error:", error);
+      showAlert("error", "An unexpected error occurred while saving.");
     }
   };
 
-  const handleAddClick = () => {
-    setSelectedType("");
-    setFormData({});
-    setBlogContent("");
-    setModalStep(1);
-    setAlertMessage(null);
-  };
-
-  const handleTypeSelect = (type) => {
-    setSelectedType(type);
-    setFormData({});
-    setModalStep(2);
-  };
-
-  const handleInputChange = (e) => {
-    try {
-      const { name, value, files } = e.target;
-      setFormData((prev) => ({ ...prev, [name]: files ? files[0] : value }));
-    } catch (error) {
-      setAlertMessage({
-        type: "error",
-        message: "Input change failed. Please check the field.",
-      });
-      console.error("Input change error:", error);
-    }
-  };
-
-  const validateFormData = (type, data, content) => {
-    if (type === "service") {
-      if (!data.name || !data.description)
-        return "Service Name and Description are required.";
-    } else if (type === "testimonial") {
-      if (!data.name || !data.text)
-        return "Client Name and Testimonial Text are required.";
-    } else if (type === "blog") {
-      if (!data.title || !data.image || !content)
-        return "Blog Title, Cover Image, and Content are required.";
-    }
-    return null; // No error
-  };
-
-  const handleSubmit = () => {
-    let contentToStore = formData.content;
-    if (selectedType === "blog") {
-      contentToStore = blogContent;
-    }
-
-    const validationError = validateFormData(
-      selectedType,
-      formData,
-      contentToStore
-    );
-
-    if (validationError) {
-      setAlertMessage({ type: "warning", message: validationError });
-      return;
-    }
-
-    try {
-      const finalFormData = { ...formData, content: contentToStore };
-      // ID uses Date.now() for unique ID and creation time for sorting
-      const id = finalFormData.id || Date.now(); 
-
-      const updatedItems = finalFormData.id
-        ? items.filter((item) => item.id !== finalFormData.id)
-        : items;
-
-      setItems([...updatedItems, { id, type: selectedType, data: finalFormData }]);
-      setModalStep(0);
-      setSelectedType("");
-      setFormData({});
-      setBlogContent("");
-
-      setAlertMessage({
-        type: "success",
-        message: `Content for ${selectedType} ${
-          finalFormData.id ? "updated" : "published"
-        } successfully! 🎉`,
-      });
-    } catch (error) {
-      setAlertMessage({
-        type: "error",
-        message: "An unexpected error occurred while saving the item.",
-      });
-      console.error("Submission error:", error);
-    }
-  };
-
-  const handleDelete = (id) => {
-    try {
+  const handleDeleteItem = (id) => {
+    if (window.confirm("Are you sure you want to delete this item? This action cannot be undone.")) {
       setItems(items.filter((item) => item.id !== id));
-      if (viewItem && viewItem.id === id) setViewItem(null);
-      setAlertMessage({ type: "success", message: "Item deleted successfully." });
-    } catch (error) {
-      setAlertMessage({
-        type: "error",
-        message: "Error deleting item. Please try again.",
-      });
-      console.error("Delete error:", error);
+      setViewItem(null); // Close view modal if open
+      showAlert("success", "Item deleted successfully.");
     }
   };
 
-  const handleUpdate = (item) => {
-    try {
-      setSelectedType(item.type);
-      setFormData({ id: item.id, ...item.data });
-      setModalStep(2);
-      setViewItem(null);
-      setAlertMessage(null);
-    } catch (error) {
-      setAlertMessage({
-        type: "error",
-        message: "Error preparing item for update.",
-      });
-      console.error("Update preparation error:", error);
-    }
+  return {
+    items, processedItems, modalState, setModalState, viewItem, setViewItem,
+    filterType, setFilterType, sortBy, setSortBy, alert, setAlert,
+    handleSaveItem, handleDeleteItem, showAlert,
   };
+};
 
-  const openReadMore = (item) => setViewItem(item);
+// --- 3. REUSABLE UI COMPONENTS ---
 
-  // Helper function for safe image URL creation (from previous revision)
-  const getObjectUrlSafely = (file) => {
-    if (!file) return null;
-    try {
-      return URL.createObjectURL(file);
-    } catch (error) {
-      console.error("Error creating object URL:", error);
-      return null;
-    }
+const Alert = ({ alert, onDismiss }) => {
+  if (!alert) return null;
+
+  const styles = {
+    success: "bg-green-100 border-green-400 text-green-700",
+    error: "bg-red-100 border-red-400 text-red-700",
+    warning: "bg-yellow-100 border-yellow-400 text-yellow-700",
   };
-
-  const renderCardContent = (item) => {
-    const content =
-      item.type === "service"
-        ? item.data.description
-        : item.type === "testimonial"
-        ? item.data.text
-        : item.data.description || item.data.content || "";
-
-    if (!content) return null;
-
-    const text =
-      item.type === "blog" ? content.replace(/<[^>]*>/g, "") : content;
-
-    return (
-      <p className="mt-2 text-gray-400 text-sm italic break-words">
-        {text.substring(0, 100)}...
-        <span className="text-indigo-400 font-medium ml-1">
-          Click to view details
-        </span>
-      </p>
-    );
-  };
-
-  const alertStyles = alertMessage
-    ? {
-        success: "bg-green-500 border-green-700",
-        error: "bg-red-500 border-red-700",
-        warning: "bg-yellow-500 border-yellow-700",
-      }[alertMessage.type] || "bg-gray-500 border-gray-700"
-    : "";
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6 sm:p-10 text-gray-100">
-      {/* --- Alert Message Display --- */}
-      {alertMessage && (
-        <div
-          className={`fixed top-4 right-4 z-50 p-4 rounded-lg text-white font-semibold shadow-2xl transition duration-500 ease-in-out transform scale-100 border-2 ${alertStyles}`}
-        >
-          {alertMessage.message}
-          <button
-            onClick={() => setAlertMessage(null)}
-            className="ml-4 font-bold opacity-75 hover:opacity-100 transition"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-      {/* ----------------------------- */}
+    <div className={`fixed top-5 right-5 z-50 p-4 rounded-md border text-sm font-medium shadow-lg transition-transform transform-gpu animate-fade-in-down ${styles[alert.type]}`}>
+      <span>{alert.message}</span>
+      <button onClick={onDismiss} className="ml-4 font-bold opacity-75 hover:opacity-100">&times;</button>
+    </div>
+  );
+};
 
-      {/* Header (unchanged) */}
-      <div className="flex items-center justify-between pb-8 border-b border-gray-700 mb-6">
-        <h1 className="text-4xl font-extrabold text-white tracking-tight">
-          Admin Dashboard 🚀
-        </h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 px-5 py-2 rounded-full shadow-lg hover:bg-red-700 transition duration-300 font-semibold text-white transform hover:scale-105"
+const DashboardHeader = ({ onLogout }) => (
+  <header className="flex items-center justify-between pb-5 border-b border-gray-200 mb-8">
+    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
+      Admin Dashboard
+    </h1>
+    <button
+      onClick={onLogout}
+      className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-red-600 transition duration-300 font-semibold text-sm transform hover:scale-105"
+    >
+      Logout
+    </button>
+  </header>
+);
+
+const FilterControls = ({ filterType, setFilterType, sortBy, setSortBy, onAddNew }) => (
+  <div className="flex flex-col sm:flex-row gap-4 mb-8 items-center justify-between">
+    <div className="flex gap-4 w-full sm:w-auto">
+      {/* Filter Dropdown */}
+      <div className="flex-1">
+        <label htmlFor="filter-type" className="block text-sm font-medium text-gray-600 mb-1">Filter By</label>
+        <select
+          id="filter-type"
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="bg-white border border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition"
         >
-          Logout
-        </button>
+          <option value="all">All Items</option>
+          <option value="service">Services</option>
+          <option value="testimonial">Testimonials</option>
+          <option value="blog">Blogs</option>
+        </select>
       </div>
+      {/* Sort Dropdown */}
+      <div className="flex-1">
+        <label htmlFor="sort-by" className="block text-sm font-medium text-gray-600 mb-1">Sort By</label>
+        <select
+          id="sort-by"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="bg-white border border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="alphabetical">Name (A-Z)</option>
+        </select>
+      </div>
+    </div>
+    {/* Add New Button */}
+    <button
+      onClick={onAddNew}
+      className="bg-blue-600 text-white px-4 py-2.5 rounded-lg shadow-sm hover:bg-blue-700 transition duration-300 font-semibold flex items-center justify-center w-full sm:w-auto transform hover:scale-105"
+    >
+      <PlusIcon /> Add New
+    </button>
+  </div>
+);
 
-      {/* --- NEW: Filter and Sort Controls --- */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-10 items-center justify-between">
-        {/* Filter Dropdown */}
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <label htmlFor="filter-type" className="text-gray-400 font-medium whitespace-nowrap">
-            Filter By:
-          </label>
-          <select
-            id="filter-type"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 w-full sm:w-40"
-          >
-            <option value="all">All Items</option>
-            <option value="service">Services</option>
-            <option value="testimonial">Testimonials</option>
-            <option value="blog">Blogs</option>
-          </select>
-        </div>
+const ContentCard = ({ item, onView, onEdit, onDelete }) => {
+  const config = FORM_CONFIG[item.type];
+  const title = item.data.name || item.data.title;
+  const description = (item.data.description || item.data.text || item.data.content || "").replace(/<[^>]*>/g, "");
+  const imageUrl = item.data.icon || item.data.photo || item.data.image;
 
-        {/* Sort Dropdown */}
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <label htmlFor="sort-by" className="text-gray-400 font-medium whitespace-nowrap">
-            Sort By:
-          </label>
-          <select
-            id="sort-by"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 w-full sm:w-40"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="alphabetical">Name (A-Z)</option>
-          </select>
+  return (
+    <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200 flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:border-blue-400 hover:-translate-y-1">
+      <div>
+        <div className="flex justify-between items-start mb-2">
+            <h3 className="text-lg font-bold text-gray-800 truncate pr-2" title={title}>{title}</h3>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize bg-${config.color}-100 text-${config.color}-800`}>
+              {item.type}
+            </span>
         </div>
+        <p className="text-sm text-gray-600 break-words line-clamp-3">
+          {description || "No description provided."}
+        </p>
+      </div>
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+        <button onClick={() => onView(item)} className="text-sm font-medium text-blue-600 hover:text-blue-800">View Details</button>
+        <div className="flex gap-2">
+            <button onClick={() => onEdit(item)} className="text-sm font-medium text-yellow-600 hover:text-yellow-800">Edit</button>
+            <button onClick={() => onDelete(item.id)} className="text-sm font-medium text-red-600 hover:text-red-800">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const ContentModal = ({ modalState, onSave, onDismiss, showAlert }) => {
+    const { type: action, item } = modalState;
+    const isEditing = action === 'edit';
+    const [selectedType, setSelectedType] = useState(isEditing ? item.type : null);
+    const [formData, setFormData] = useState(isEditing ? item.data : {});
+    const [blogContent, setBlogContent] = useState(isEditing && item.type === 'blog' ? item.data.content : '');
+    const [isEditorReady, setIsEditorReady] = useState(false);
+
+    // Effect to reset form when modal opens for adding a new item
+    useEffect(() => {
+        if (action === 'add') {
+            setSelectedType(null);
+            setFormData({});
+            setBlogContent('');
+        }
+    }, [action]);
+
+    if (!action) return null;
+
+    const config = selectedType ? FORM_CONFIG[selectedType] : null;
+    const title = `${isEditing ? 'Edit' : 'Add New'} ${config ? config.name : ''}`;
+
+    const handleInputChange = (e) => {
+        const { name, value, files } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: files ? files[0] : value }));
+    };
+
+    const handleSubmit = () => {
+        // Validate required fields
+        for (const field of config.fields) {
+            const isMissingFile = field.type === 'file' && field.required && !formData[field.name] && (!isEditing || !item.data[field.name]);
+            const isMissingText = field.type !== 'file' && field.required && !formData[field.name] && (field.type !== 'editor' || !blogContent);
+
+            if (isMissingFile || isMissingText) {
+                showAlert('warning', `${field.placeholder || field.label} is required.`);
+                return;
+            }
+        }
         
-        {/* Add New Button (Moved for better layout) */}
-        <button
-          onClick={handleAddClick}
-          className="bg-indigo-600 px-5 py-2 rounded-full shadow-lg hover:bg-indigo-700 transition duration-300 font-semibold text-white transform hover:scale-105 w-full sm:w-auto"
-        >
-          + Add New
-        </button>
-      </div>
-      {/* ------------------------------------------- */}
+        const dataToSave = {
+            ...formData,
+            content: selectedType === 'blog' ? blogContent : formData.content,
+        };
 
-      {/* Grid (Now uses filteredAndSortedItems) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {/*
-          Removing the original '+ Add New Item' card here to use the button above.
-          This makes the grid cleaner and keeps controls grouped.
-        */}
-
-        {filteredAndSortedItems.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => openReadMore(item)}
-            className="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700/50 relative transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-indigo-500/20 cursor-pointer flex flex-col justify-between min-h-[12rem]"
-          >
-            <div>
-              <span
-                className={`text-xs font-semibold px-3 py-1 rounded-full absolute top-3 right-3 capitalize 
-              ${
-                item.type === "service"
-                  ? "bg-blue-600 text-white"
-                  : item.type === "testimonial"
-                  ? "bg-green-600 text-white"
-                  : "bg-purple-600 text-white"
-              }`}
-              >
-                {item.type}
-              </span>
-
-              <h2 className="text-xl font-bold mt-2 text-white truncate">
-                {item.type === "service"
-                  ? item.data.name
-                  : item.type === "testimonial"
-                  ? item.data.name
-                  : item.data.title}
-              </h2>
-
-              {renderCardContent(item)}
-
-              {/* Image Rendering (uses safe function) */}
-              {item.type === "service" && item.data.icon && (
-                <img
-                  src={getObjectUrlSafely(item.data.icon)}
-                  alt="Service Icon"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "placeholder-error-icon.svg";
-                  }}
-                  className="mt-4 w-12 h-12 rounded-lg object-cover border-2 border-blue-500/70"
-                />
-              )}
-
-              {item.type === "testimonial" && item.data.photo && (
-                <img
-                  src={getObjectUrlSafely(item.data.photo)}
-                  alt="testimonial photo"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "placeholder-error-photo.svg";
-                  }}
-                  className="mt-4 w-16 h-16 rounded-full object-cover border-2 border-indigo-500"
-                />
-              )}
-
-              {item.type === "blog" && item.data.image && (
-                <img
-                  src={getObjectUrlSafely(item.data.image)}
-                  alt="blog main"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "placeholder-error-image.svg";
-                  }}
-                  className="mt-4 w-full h-40 rounded-lg object-cover border-2 border-purple-500"
-                />
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modals and Read More Modal (kept unchanged for brevity, only showing the new logic) */}
-      {/* Modal Step 1 (Type Selection) */}
-      {modalStep > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300">
-          <div className="bg-gray-800 p-8 rounded-2xl w-full max-w-lg shadow-2xl text-gray-100 border border-gray-700">
-            {modalStep === 1 && (
-              <>
-                <h2 className="text-2xl font-bold mb-6 text-white">
-                  What type of content are you adding?
-                </h2>
-                <div className="flex flex-col space-y-3">
-                  {["service", "testimonial", "blog"].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => handleTypeSelect(type)}
-                      className="bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-xl transition transform hover:scale-[1.01] font-semibold text-lg"
-                    >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </button>
-                  ))}
+        onSave({
+            id: isEditing ? item.id : null,
+            type: selectedType,
+            data: dataToSave,
+        });
+    };
+    
+    // Step 1: Type Selection
+    if (action === 'add' && !selectedType) {
+        return (
+             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white p-8 rounded-xl w-full max-w-md shadow-2xl">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800">What do you want to add?</h2>
+                    <div className="flex flex-col space-y-3">
+                         {Object.entries(FORM_CONFIG).map(([key, { name }]) => (
+                            <button key={key} onClick={() => setSelectedType(key)}
+                                className="w-full text-left bg-gray-100 hover:bg-blue-100 hover:text-blue-700 p-3 rounded-lg transition font-semibold"
+                            >
+                                {name}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={onDismiss} className="mt-6 text-sm text-gray-500 hover:text-gray-800">Cancel</button>
                 </div>
-                <button
-                  onClick={() => setModalStep(0)}
-                  className="mt-6 text-gray-400 hover:text-white transition font-medium"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-            {/* Modal Step 2 (Form) */}
-            {modalStep === 2 && (
-              <>
-                <h2 className="text-2xl font-bold mb-6 text-white capitalize">
-                  {formData.id ? "Update" : "Add New"} {selectedType}
-                </h2>
-                <div className="flex flex-col space-y-4">
-                  {selectedType === "service" && (
-                    <>
-                      <input
-                        type="text"
-                        name="name"
-                        placeholder="Service Name"
-                        value={formData.name || ""}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 focus:ring-2 focus:ring-blue-500 outline-none text-gray-200 transition"
-                      />
-                      <textarea
-                        name="description"
-                        placeholder="Service Description"
-                        rows="4"
-                        value={formData.description || ""}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 focus:ring-2 focus:ring-blue-500 outline-none text-gray-200 transition resize-none"
-                      />
-                      <label className="block text-sm font-medium text-gray-400">
-                        Service Icon/Image (Optional)
-                        <input
-                          type="file"
-                          name="icon"
-                          onChange={handleInputChange}
-                          className="mt-1 block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
-                        />
-                      </label>
-                    </>
-                  )}
-
-                  {selectedType === "testimonial" && (
-                    <>
-                      <input
-                        type="text"
-                        name="name"
-                        placeholder="Client Name"
-                        value={formData.name || ""}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 focus:ring-2 focus:ring-green-500 outline-none text-gray-200 transition"
-                      />
-                      <textarea
-                        name="text"
-                        placeholder="Testimonial Text"
-                        rows="4"
-                        value={formData.text || ""}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 focus:ring-2 focus:ring-green-500 outline-none text-gray-200 transition resize-none"
-                      />
-                      <label className="block text-sm font-medium text-gray-400">
-                        Client Photo (Optional)
-                        <input
-                          type="file"
-                          name="photo"
-                          onChange={handleInputChange}
-                          className="mt-1 block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-white hover:file:bg-green-600"
-                        />
-                      </label>
-                    </>
-                  )}
-
-                  {selectedType === "blog" && (
-                    <>
-                      <input
-                        type="text"
-                        name="title"
-                        placeholder="Blog Title"
-                        value={formData.title || ""}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 rounded-lg border border-gray-600 bg-gray-700 focus:ring-2 focus:ring-purple-500 outline-none text-gray-200 transition"
-                      />
-
-                      <label className="block text-sm font-medium text-gray-400">
-                        Blog Cover Image (Required)
-                        <input
-                          type="file"
-                          name="image"
-                          onChange={handleInputChange}
-                          className="mt-1 block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600"
-                        />
-                      </label>
-
-                      {!isEditorReady && (
-                        <p className="text-yellow-400">
-                          Loading rich text editor...
-                        </p>
-                      )}
-                      <Editor
-                        apiKey="6tmgaucy6jn9sbs54pscrnc3kh2mr2ls59320y1lwviq205s"
-                        value={blogContent}
-                        onInit={(evt, editor) => {
-                          setIsEditorReady(true);
-                          editor.on("error", (e) => {
-                            setAlertMessage({
-                              type: "error",
-                              message: "TinyMCE Editor failed to load.",
-                            });
-                            console.error("TinyMCE error:", e);
-                            setIsEditorReady(false);
-                          });
-                        }}
-                        init={{
-                          height: 300,
-                          menubar: false,
-                          skin: "oxide-dark",
-                          content_css: "dark",
-                          plugins: [
-                            "advlist autolink lists link image charmap preview anchor",
-                            "searchreplace visualblocks code fullscreen",
-                            "insertdatetime media table paste code help wordcount",
-                          ],
-                          toolbar:
-                            "undo redo | formatselect | bold italic underline | " +
-                            "alignleft aligncenter alignright alignjustify | " +
-                            "bullist numlist outdent indent | removeformat | image | help",
-                        }}
-                        onEditorChange={(content) => setBlogContent(content)}
-                      />
-                    </>
-                  )}
-
-                  <div className="flex justify-between items-center pt-4">
-                    <button
-                      onClick={handleSubmit}
-                      className="bg-indigo-600 px-6 py-2 rounded-lg hover:bg-indigo-700 transform transition font-bold text-white shadow-md hover:scale-[1.02]"
-                    >
-                      {formData.id ? "Save Changes" : "Publish"}
-                    </button>
-                    <button
-                      onClick={() => setModalStep(0)}
-                      className="text-gray-400 hover:text-white transition font-medium"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+            </div>
+        );
+    }
+    
+    // Step 2: Form
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-8 rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+                    <button onClick={onDismiss} className="text-gray-400 hover:text-gray-700"><CloseIcon /></button>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Read More Modal (unchanged) */}
-      {viewItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300">
-          <div className="bg-gray-800 p-8 rounded-2xl w-full max-w-2xl shadow-2xl text-gray-100 max-h-[90vh] overflow-y-auto relative border border-gray-700">
-            <button
-              onClick={() => setViewItem(null)}
-              className="absolute top-4 right-4 text-gray-400 text-2xl hover:text-white transition"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-
-            <h2 className="text-3xl font-bold mb-6 capitalize text-white border-b border-gray-700 pb-2">
-              {viewItem.type} Details
-            </h2>
-
-            <div className="mb-6 space-y-4">
-              {viewItem.type === "service" && (
-                <>
-                  <p className="text-xl font-semibold">
-                    Name:{" "}
-                    <span className="font-normal text-blue-400">
-                      {viewItem.data.name}
-                    </span>
-                  </p>
-                  <div>
-                    <strong className="block mb-1 text-gray-400">
-                      Description:
-                    </strong>
-                    <p className="text-gray-300 whitespace-pre-wrap">
-                      {viewItem.data.description}
-                    </p>
-                  </div>
-                  {viewItem.data.icon && (
-                    <img
-                      src={getObjectUrlSafely(viewItem.data.icon)}
-                      alt="Service Icon"
-                      className="w-16 h-16 rounded-lg object-cover border-4 border-blue-500 mt-4"
-                    />
-                  )}
-                </>
-              )}
-
-              {viewItem.type === "testimonial" && (
-                <>
-                  <p className="text-xl font-semibold">
-                    Client:{" "}
-                    <span className="font-normal text-green-400">
-                      {viewItem.data.name}
-                    </span>
-                  </p>
-                  <div>
-                    <strong className="block mb-1 text-gray-400">
-                      Testimonial:
-                    </strong>
-                    <p className="text-gray-300 italic whitespace-pre-wrap">
-                      "{viewItem.data.text}"
-                    </p>
-                  </div>
-                  {viewItem.data.photo && (
-                    <img
-                      src={getObjectUrlSafely(viewItem.data.photo)}
-                      alt="Client photo"
-                      className="w-24 h-24 rounded-full object-cover border-4 border-green-500 mt-4"
-                    />
-                  )}
-                </>
-              )}
-
-              {viewItem.type === "blog" && (
-                <>
-                  <p className="text-xl font-semibold">
-                    Title:{" "}
-                    <span className="font-normal text-purple-400">
-                      {viewItem.data.title}
-                    </span>
-                  </p>
-                  {viewItem.data.image && (
-                    <img
-                      src={getObjectUrlSafely(viewItem.data.image)}
-                      alt="blog main"
-                      className="w-full h-64 rounded-lg object-cover border-4 border-purple-500 my-4"
-                    />
-                  )}
-                  <div>
-                    <strong className="block mb-1 text-gray-400">
-                      Content:
-                    </strong>
-                    <div
-                      className="text-gray-300 prose prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{
-                        __html: viewItem.data.content,
-                      }}
-                    />
-                  </div>
-                </>
-              )}
+                
+                <div className="space-y-4">
+                    {config.fields.map(field => {
+                        if (field.type === 'editor') {
+                             return (
+                                <div key={field.name}>
+                                    {!isEditorReady && <p className="text-yellow-600 text-sm">Loading editor...</p>}
+                                    <Editor
+                                        apiKey="YOUR_API_KEY_HERE" // Replace with your TinyMCE API key
+                                        value={blogContent}
+                                        onInit={() => setIsEditorReady(true)}
+                                        init={{
+                                            height: 300,
+                                            menubar: false,
+                                            plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste code help wordcount',
+                                            toolbar: 'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | image | help'
+                                        }}
+                                        onEditorChange={(content) => setBlogContent(content)}
+                                    />
+                                </div>
+                            );
+                        } else if (field.type === 'textarea') {
+                             return (
+                                <textarea key={field.name} name={field.name} placeholder={field.placeholder}
+                                    value={formData[field.name] || ''} onChange={handleInputChange}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 transition resize-none"
+                                    rows="4"
+                                />
+                            );
+                        } else if (field.type === 'file') {
+                            return (
+                                <div key={field.name}>
+                                    <label className="block text-sm font-medium text-gray-600">{field.label}</label>
+                                    <input type="file" name={field.name} onChange={handleInputChange} accept={field.accept}
+                                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    />
+                                </div>
+                            );
+                        } else {
+                            return (
+                                <input key={field.name} type={field.type} name={field.name} placeholder={field.placeholder}
+                                    value={formData[field.name] || ''} onChange={handleInputChange}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 transition"
+                                />
+                            );
+                        }
+                    })}
+                </div>
+                
+                <div className="flex justify-end items-center pt-6 mt-6 border-t border-gray-200 gap-3">
+                    <button onClick={onDismiss} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition">Cancel</button>
+                    <button onClick={handleSubmit} className={`px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition`}>
+                        {isEditing ? 'Save Changes' : 'Publish'}
+                    </button>
+                </div>
             </div>
-
-            <div className="flex space-x-4 pt-4 border-t border-gray-700">
-              <button
-                onClick={() => handleUpdate(viewItem)}
-                className="bg-yellow-500 text-gray-900 px-5 py-2 rounded-lg hover:bg-yellow-400 transform transition font-bold shadow-md hover:scale-[1.02]"
-              >
-                Edit Item
-              </button>
-              <button
-                onClick={() => handleDelete(viewItem.id)}
-                className="bg-red-600 text-white px-5 py-2 ml-2 rounded-lg hover:bg-red-700 transform transition font-bold shadow-md hover:scale-[1.02]"
-              >
-                Delete Item
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+    );
+};
+
+// --- 4. MAIN COMPONENT ---
+
+function AdminPanel({ setIsAuthenticated }) {
+  const {
+    processedItems, modalState, setModalState, viewItem, setViewItem,
+    filterType, setFilterType, sortBy, setSortBy, alert, setAlert,
+    handleSaveItem, handleDeleteItem, showAlert
+  } = useContentManager([]); // Start with empty items
+
+  const handleLogout = () => {
+    localStorage.removeItem("isAuthenticated");
+    setIsAuthenticated(false);
+    // Note: The alert won't be visible after redirect, but this is good practice.
+  };
+  
+  return (
+    <div className="min-h-screen bg-gray-50 p-6 sm:p-10 font-sans">
+      <Alert alert={alert} onDismiss={() => setAlert(null)} />
+      
+      <DashboardHeader onLogout={handleLogout} />
+
+      <main>
+        <FilterControls
+          filterType={filterType} setFilterType={setFilterType}
+          sortBy={sortBy} setSortBy={setSortBy}
+          onAddNew={() => setModalState({ type: 'add', item: null })}
+        />
+
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {processedItems.length > 0 ? (
+            processedItems.map((item) => (
+              <ContentCard key={item.id} item={item}
+                onView={setViewItem}
+                onEdit={(itemToEdit) => setModalState({ type: 'edit', item: itemToEdit })}
+                onDelete={handleDeleteItem}
+              />
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12 bg-white rounded-lg border border-dashed">
+                <h3 className="text-lg font-medium text-gray-700">No items found.</h3>
+                <p className="text-sm text-gray-500 mt-1">Click "Add New" to get started!</p>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Modals */}
+      {modalState.type &&
+        <ContentModal
+          modalState={modalState}
+          onSave={handleSaveItem}
+          onDismiss={() => setModalState({ type: null, data: null })}
+          showAlert={showAlert}
+        />
+      }
+      
+   
+
     </div>
   );
 }
