@@ -1,10 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
 import HeroBg from "../assets/hero-bg.png";
-import HandLeft from "../assets/hand-left.png"; // 👈 left hand image
-import HandRight from "../assets/hand-right.png"; // 👈 right hand image
+import HandLeft from "../assets/hand-left.png";
+import HandRight from "../assets/hand-right.png";
 import Navbar from "./Navbar";
 import { NavLink } from "react-router-dom";
+import { FaInstagram, FaLinkedin, FaFacebook } from "react-icons/fa";
 
 const gradientAnimation = `
   @keyframes gradient-shift {
@@ -36,10 +37,10 @@ const gradientAnimation = `
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-screen overflow-hidden overflow-x-hidden text-white flex flex-col">
+    <section className="relative h-screen w-screen overflow-hidden text-white flex flex-col">
       <style>{gradientAnimation}</style>
 
-      {/* Navbar inside Hero */}
+      {/* Navbar */}
       <Navbar className="w-[100%] absolute top-0" />
 
       {/* Background */}
@@ -59,12 +60,9 @@ const HeroSection = () => {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col justify-center items-center text-center px-4 py-10 min-h-screen">
+      <div className="relative z-10 flex flex-col justify-center items-center text-center px-4 flex-1">
         <div className="max-w-5xl mt-20">
-          <h1
-            className="fade-up text-[4rem] sm:text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight tracking-tight"
-            style={{ fontSize: "4rem" }}
-          >
+          <h1 className="fade-up text-[4rem] sm:text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight tracking-tight">
             DIGITAL SOLUTION
           </h1>
 
@@ -85,7 +83,7 @@ const HeroSection = () => {
           </p>
         </div>
 
-        {/* Two Hands Images */}
+        {/* Two Hands */}
         <div className="relative w-full flex justify-center items-center mt-2 mb-8 overflow-x-hidden">
           <motion.img
             src={HandLeft}
@@ -122,11 +120,56 @@ const HeroSection = () => {
             to="/services"
             className="btn-animate flex items-center gap-2 px-8 py-4 font-bold text-lg sm:text-xl text-black bg-[#FBBF24] rounded-full shadow-lg"
           >
-            {" "}
-            Explore Our Services <span className="ml-2">→</span>{" "}
+            Explore Our Services <span className="ml-2">→</span>
           </NavLink>
         </div>
       </div>
+
+      {/* Social Icons - Right Side */}
+      <div className="fixed right-4 top-1/3 flex flex-col gap-5 z-20">
+        <motion.a
+          href="https://www.instagram.com/raulo_enterprises?igsh=aDhlajJ1cm4wd2g1"
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, type: "spring" }}
+          className="group relative text-3xl text-gray-300 transition-transform duration-300"
+        >
+          <FaInstagram className="group-hover:text-pink-500 group-hover:scale-125 group-hover:rotate-6 drop-shadow-[0_0_10px_rgba(255,20,147,0.7)] transition-all duration-300" />
+        </motion.a>
+
+        <motion.a
+          href="https://www.linkedin.com/company/raulo-enterprises/"
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.4, type: "spring" }}
+          className="group relative text-3xl text-gray-300 transition-transform duration-300"
+        >
+          <FaLinkedin className="group-hover:text-blue-500 group-hover:scale-125 group-hover:-rotate-6 drop-shadow-[0_0_10px_rgba(0,119,181,0.7)] transition-all duration-300" />
+        </motion.a>
+
+        <motion.a
+          href="https://www.facebook.com/share/1aDy1fzuEh/"
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.6, type: "spring" }}
+          className="group relative text-3xl text-gray-300 transition-transform duration-300"
+        >
+          <FaFacebook className="group-hover:text-blue-600 group-hover:scale-125 group-hover:rotate-12 drop-shadow-[0_0_10px_rgba(59,89,152,0.7)] transition-all duration-300" />
+        </motion.a>
+      </div>
+
+      {/* Copyright - Always visible at bottom */}
+      <footer className="absolute bottom-1 left-0 right-0 z-10 text-gray-400 text-center">
+        <p className="text-sm">
+          &copy; {new Date().getFullYear()} Your Company. All Rights Reserved.
+        </p>
+      </footer>
     </section>
   );
 };
